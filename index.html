@@ -1187,8 +1187,8 @@ fc.addEventListener('change', applyFilter);
   }
 
   function filterHistoryCards(){
-    // 「逐月明細(歷史)」僅保留過去月份
-    var cards = document.querySelectorAll('section.month-card[data-month]');
+    // 「歷史明細」僅保留過去月份，並依年/月由新到舊排序
+    var cards = Array.from(document.querySelectorAll('section.month-card[data-month]'));
     cards.forEach(function(card){
       var dm = card.getAttribute('data-month');
       if (!/^\d{6}$/.test(dm)) return;
@@ -1198,6 +1198,14 @@ fc.addEventListener('change', applyFilter);
         card.style.display = 'none';
       }
     });
+    // 排序：data-month 由大到小（新到舊）
+    var grid = cards.length ? cards[0].parentNode : null;
+    if (grid) {
+      cards.sort(function(a, b){
+        return b.getAttribute('data-month').localeCompare(a.getAttribute('data-month'));
+      });
+      cards.forEach(function(c){ grid.appendChild(c); });
+    }
   }
 
   function init(){
