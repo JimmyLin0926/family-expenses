@@ -307,6 +307,18 @@
     padding: 0;
   }
   .del-btn:hover { background: #fef2f2; }
+  .del-month-btn {
+    margin-left: 8px;
+    background: transparent;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-family: inherit;
+  }
+  .del-month-btn:hover { background: #fef2f2; }
   .add-item-btn {
     margin-top: 10px;
     background: transparent;
@@ -378,8 +390,9 @@
         <button id="adminToggleBtn" class="action-btn" type="button">進入管理模式</button>
       </span>
     </h2>
-    <p style="color:#64748b;margin:0 0 12px;font-size:13px;">範圍：2026/05 ~ 2026/12；2026/05 為進行中，2026/06 起為尚未到達月份。項目依類別分組，類別之間以空白行分隔。未註明固定金額之項目（信用卡、手機費、水電瓦斯費）金額欄為空白。</p>
+    <p style="color:#64748b;margin:0 0 12px;font-size:13px;">月份卡片依年/月排序。「進入管理模式」可編輯／新增月份；新增月份會自動帶入該月奇／偶數預設項目。資料即時同步至 Google 試算表。</p>
     <div id="adminToolbar" class="admin-toolbar" style="display:none;">
+      <button class="action-btn" type="button" onclick="window.__expCloud.newMonth()">＋ 新增月份</button>
       <button class="action-btn btn-secondary" type="button" onclick="window.__expCloud.sync()">↻ 從雲端載入</button>
       <button class="action-btn btn-secondary" type="button" onclick="window.__expCloud.setup()">⚙ 雲端設定</button>
       <button class="action-btn btn-secondary" type="button" onclick="window.__expCloud.reset()">重設為預設</button>
@@ -573,6 +586,20 @@ fc.addEventListener('change', applyFilter);
     </div>
   </div>
 </div>
+<div id="newMonthModal" class="modal" style="display:none;">
+  <div class="modal-bg" onclick="window.__expCloud.newMonthClose()"></div>
+  <div class="modal-box" style="max-width:420px;">
+    <h3>新增月份</h3>
+    <p style="color:#475569;font-size:13px;margin:0 0 12px;">選擇年月後將自動帶入預設項目：每月固定項目（房貸／信貸／信用卡／中華電信／台灣大哥大），加上該月奇偶對應的項目（管理費／車位費／水電瓦斯費）。</p>
+    <label style="display:block;font-size:13px;color:#475569;margin-bottom:6px;">年/月：</label>
+    <input type="month" id="newMonthPick" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;font-family:inherit;">
+    <p id="newMonthMsg" style="margin:8px 0 0;font-size:12px;color:#64748b;min-height:18px;"></p>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+      <button class="action-btn btn-secondary" type="button" onclick="window.__expCloud.newMonthClose()">取消</button>
+      <button class="action-btn" type="button" onclick="window.__expCloud.newMonthConfirm()">建立</button>
+    </div>
+  </div>
+</div>
 <script>
 (function(){
   var CONFIG_KEY = 'family-expenses-config-v1';
@@ -608,11 +635,39 @@ fc.addEventListener('change', applyFilter);
     var out = {};
     for (var m = 5; m <= 12; m++){
       var key = '2026-' + String(m).padStart(2,'0');
-      var list = TPL_EVERY.map(function(x){ return Object.assign({}, x); });
-      var extra = (m % 2 === 1) ? TPL_ODD : TPL_EVEN;
-      extra.forEach(function(x){ list.push(Object.assign({}, x)); });
-      out[key] = list;
+      out[key] = buildDefaultItemsFor(2026, m);
     }
+    return out;
+  }
+
+  function buildDefaultItemsFor(year, mNum){
+    var list = TPL_EVERY.map(function(x){ return Object.assign({}, x); });
+    var extra = (mNum % 2 === 1) ? TPL_ODD : TPL_EVEN;
+    extra.forEach(function(x){ list.push(Object.assign({}, x)); });
+    return list;
+  }
+
+  function normalizeMonthKey(v){
+    if (v == null || v === '') return null;
+    var s = String(v).trim();
+    var m1 = s.match(/^(\d{4})-(\d{1,2})$/);
+    if (m1) return m1[1] + '-' + String(parseInt(m1[2],10)).padStart(2,'0');
+    // 形如 "Fri May 01 2026 00:00:00 GMT+0800 ..." 或 ISO 字串
+    var d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2,'0');
+    }
+    return null;
+  }
+
+  function normalizeSchedule(data){
+    var out = {};
+    Object.keys(data || {}).forEach(function(k){
+      var nk = normalizeMonthKey(k);
+      if (!nk) return;
+      if (!out[nk]) out[nk] = [];
+      (data[k] || []).forEach(function(it){ out[nk].push(it); });
+    });
     return out;
   }
 
@@ -630,7 +685,7 @@ fc.addEventListener('change', applyFilter);
   }
 
   var CONFIG    = loadConfig();
-  var SCHEDULE  = loadCache();
+  var SCHEDULE  = normalizeSchedule(loadCache());
   var adminMode = false;
   var saveTimer = null;
   var savingNow = false;
@@ -645,11 +700,11 @@ fc.addEventListener('change', applyFilter);
     if (v === null || v === undefined || v === '') return '';
     return Number(v).toLocaleString();
   }
-  function getMonthState(mNum){
+  function getMonthState(yNum, mNum){
     var today = new Date();
     var y = today.getFullYear(), m = today.getMonth() + 1;
-    if (y > 2026) return 'past';
-    if (y < 2026) return 'future';
+    if (y > yNum) return 'past';
+    if (y < yNum) return 'future';
     if (m > mNum) return 'past';
     if (m === mNum) return 'current';
     return 'future';
@@ -675,11 +730,13 @@ fc.addEventListener('change', applyFilter);
     grid.innerHTML = keys.map(function(k){ return renderMonthCard(k, SCHEDULE[k]); }).join('');
   }
   function renderMonthCard(monthKey, items){
-    var parts = monthKey.split('-');
-    var yy = parts[0], mm = parts[1];
+    var nk = normalizeMonthKey(monthKey) || monthKey;
+    var parts = nk.split('-');
+    var yy = parts[0], mm = parts[1] || '';
+    var yNum = parseInt(yy, 10);
     var mNum = parseInt(mm, 10);
     var label = yy + '/' + mm;
-    var state = getMonthState(mNum);
+    var state = getMonthState(yNum, mNum);
     var stateLabel = state === 'past' ? '已結束' : (state === 'current' ? '進行中' : '未到達');
     var stateClass = 'state-' + state;
 
@@ -708,9 +765,10 @@ fc.addEventListener('change', applyFilter);
 
     var headExtra = adminMode ? '<th style="width:36px;"></th>' : '';
     var addBtn = adminMode ? '<button class="add-item-btn" type="button" onclick="window.__expAdm.add(\'' + monthKey + '\')">+ 新增項目</button>' : '';
+    var delMonthBtn = adminMode ? '<button class="del-month-btn" type="button" onclick="window.__expCloud.delMonth(\'' + monthKey + '\')" title="刪除整月">刪除整月 ×</button>' : '';
 
     return '<section class="y26-card ' + stateClass + '">' +
-      '<h3>' + label + ' <span class="state-badge ' + stateClass + '">' + stateLabel + '</span><span class="month-total">固定 NT$ ' + fmtMoney(fixedSum) + '</span></h3>' +
+      '<h3>' + label + ' <span class="state-badge ' + stateClass + '">' + stateLabel + '</span><span class="month-total">固定 NT$ ' + fmtMoney(fixedSum) + '</span>' + delMonthBtn + '</h3>' +
       '<table class="items-table"><thead><tr><th>項目</th><th>類別</th><th class="num">金額</th><th>已繳</th>' + headExtra + '</tr></thead><tbody>' + body + '</tbody></table>' +
       addBtn +
     '</section>';
@@ -858,7 +916,7 @@ fc.addEventListener('change', applyFilter);
       if (!res.ok) throw new Error('HTTP ' + res.status);
       var json = await res.json();
       if (!json.ok) throw new Error(json.error || '伺服器錯誤');
-      var data = json.data || {};
+      var data = normalizeSchedule(json.data || {});
       if (Object.keys(data).length === 0) {
         // 試算表為空，把目前資料推上去
         SCHEDULE = buildDefault();
@@ -879,6 +937,41 @@ fc.addEventListener('change', applyFilter);
   }
 
   // === Setup modal ===
+  // === 新增月份 ===
+  function openNewMonth(){
+    var picker = document.getElementById('newMonthPick');
+    var now = new Date();
+    var y = now.getFullYear(), m = now.getMonth() + 2;
+    if (m > 12) { y++; m -= 12; }
+    picker.value = y + '-' + String(m).padStart(2,'0');
+    setMsg('newMonthMsg', '', '#64748b');
+    document.getElementById('newMonthModal').style.display = 'block';
+  }
+  function closeNewMonth(){ document.getElementById('newMonthModal').style.display = 'none'; }
+  function confirmNewMonth(){
+    var val = (document.getElementById('newMonthPick').value || '').trim();
+    var m1 = val.match(/^(\d{4})-(\d{1,2})$/);
+    if (!m1) { setMsg('newMonthMsg', '請選擇年月', '#dc2626'); return; }
+    var key = m1[1] + '-' + String(parseInt(m1[2],10)).padStart(2,'0');
+    if (SCHEDULE[key]) { setMsg('newMonthMsg', '此月份已存在', '#dc2626'); return; }
+    SCHEDULE[key] = buildDefaultItemsFor(parseInt(m1[1],10), parseInt(m1[2],10));
+    schedulePush();
+    renderSchedule();
+    closeNewMonth();
+  }
+  function delMonth(monthKey){
+    if (!confirm('確定刪除 ' + monthKey.replace('-','/') + ' 整月所有項目？')) return;
+    delete SCHEDULE[monthKey];
+    schedulePush();
+    renderSchedule();
+  }
+  function setMsg(id, text, color){
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text || '';
+    el.style.color = color || '#64748b';
+  }
+
   function openSetup(){
     document.getElementById('setupUrl').value = CONFIG.url || '';
     setSetupMsg('');
@@ -945,7 +1038,9 @@ fc.addEventListener('change', applyFilter);
     setup: openSetup, setupClose: closeSetup, setupSave: setupSave,
     openInTab: openInTab,
     clearUrl: clearUrl, sync: pullNow, reset: resetAll,
-    exportJson: exportJson
+    exportJson: exportJson,
+    newMonth: openNewMonth, newMonthClose: closeNewMonth, newMonthConfirm: confirmNewMonth,
+    delMonth: delMonth
   };
 
   function init(){
