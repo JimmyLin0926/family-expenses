@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家庭開銷彙整報表</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  *,*::before,*::after { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', sans-serif;
+    background: #f1f5f9;
+    color: #0f172a;
+    line-height: 1.5;
+  }
+  header {
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    color: #fff;
+    padding: 32px 24px;
+    box-shadow: 0 4px 20px rgba(79,70,229,0.2);
+  }
+  header h1 { margin: 0 0 4px 0; font-size: 28px; }
+  header p { margin: 0; opacity: .9; font-size: 14px; }
+  main { max-width: 1280px; margin: 0 auto; padding: 24px 16px 64px; }
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin: -48px 0 24px 0;
+  }
+  .stat {
+    background: #fff;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(15,23,42,0.06);
+  }
+  .stat .label { color: #64748b; font-size: 13px; margin-bottom: 6px; }
+  .stat .value { font-size: 26px; font-weight: 700; color: #0f172a; }
+  .stat .sub { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+  .card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 12px rgba(15,23,42,0.06);
+  }
+  .card h2 {
+    font-size: 18px;
+    margin: 0 0 16px 0;
+    color: #1e293b;
+    border-left: 4px solid #4f46e5;
+    padding-left: 10px;
+  }
+  .chart-wrap { position: relative; height: 360px; }
+  .chart-wrap-sm { position: relative; height: 300px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 900px) { .row2 { grid-template-columns: 1fr; } }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  thead th {
+    text-align: left;
+    background: #f8fafc;
+    color: #475569;
+    padding: 10px 12px;
+    font-weight: 600;
+    border-bottom: 2px solid #e2e8f0;
+  }
+  tbody td {
+    padding: 9px 12px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  tbody tr:hover { background: #f8fafc; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  thead th.num { text-align: right; }
+  .cat-badge {
+    display: inline-block;
+    background: #e0e7ff;
+    color: #4338ca;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+  }
+  .paid { color: #059669; font-weight: 600; }
+  .unpaid { color: #dc2626; font-weight: 600; }
+  .color-dot {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+  .month-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+  @media (max-width: 720px) {
+    .month-grid { grid-template-columns: 1fr; }
+  }
+  .month-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(15,23,42,0.05);
+  }
+  .month-card h3 {
+    margin: 0 0 12px 0;
+    font-size: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #1e293b;
+    border-bottom: 2px solid #f1f5f9;
+    padding-bottom: 8px;
+  }
+  .month-card .month-total {
+    color: #4f46e5;
+    font-weight: 700;
+  }
+  .items-table { font-size: 13px; }
+  .items-table td { padding: 6px 8px; }
+  .items-table thead th { font-size: 12px; padding: 6px 8px; }
+  .controls {
+    margin-bottom: 16px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .controls input, .controls select {
+    padding: 6px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  footer {
+    text-align: center;
+    color: #94a3b8;
+    font-size: 12px;
+    padding: 20px;
+  }
+  /* 2026 schedule */
+  .y26-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+  @media (max-width: 720px) { .y26-grid { grid-template-columns: 1fr; } }
+  .items-table tr.cat-sep td {
+    padding: 0;
+    border-bottom: none;
+    height: 10px;
+    background: transparent;
+  }
+  .items-table tr.cat-sep td:hover { background: transparent; }
+  .y26-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px 16px;
+    box-shadow: 0 2px 8px rgba(15,23,42,0.05);
+    border-top: 4px solid #6366f1;
+  }
+  .y26-card.state-past    { border-top-color: #10b981; }
+  .y26-card.state-current { border-top-color: #f59e0b; }
+  .y26-card.state-future  { border-top-color: #6366f1; opacity: 0.95; }
+  .y26-card h3 {
+    margin: 0 0 10px 0;
+    font-size: 15px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    border-bottom: 2px solid #f1f5f9;
+    padding-bottom: 8px;
+  }
+  .y26-card h3 .month-total {
+    margin-left: auto;
+    color: #4f46e5;
+    font-weight: 700;
+  }
+  .state-badge {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .state-badge.state-past    { background: #d1fae5; color: #065f46; }
+  .state-badge.state-current { background: #fef3c7; color: #92400e; }
+  .state-badge.state-future  { background: #e0e7ff; color: #3730a3; }
+  .proj-tag {
+    display: inline-block;
+    background: #f1f5f9;
+    color: #64748b;
+    padding: 0 6px;
+    border-radius: 8px;
+    font-size: 10px;
+    margin-left: 4px;
+  }
+  .empty-note {
+    text-align: center;
+    color: #94a3b8;
+    padding: 14px;
+    font-size: 13px;
+  }
+  .legend-line {
+    margin: 8px 0 14px;
+    color: #64748b;
+    font-size: 13px;
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .legend-line span::before {
+    content: "";
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .legend-line .lg-past::before    { background: #10b981; }
+  .legend-line .lg-current::before { background: #f59e0b; }
+  .legend-line .lg-future::before  { background: #6366f1; }
+  /* Admin controls */
+  .action-btn {
+    padding: 7px 14px;
+    background: #4f46e5;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .action-btn:hover { background: #4338ca; }
+  .action-btn.btn-secondary {
+    background: #fff;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+  }
+  .action-btn.btn-secondary:hover { background: #f8fafc; }
+  .action-btn.btn-danger { background: #dc2626; }
+  .action-btn.btn-danger:hover { background: #b91c1c; }
+  .admin-toolbar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 12px 14px;
+    background: #eef2ff;
+    border-radius: 8px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    border: 1px solid #c7d2fe;
+  }
+  .admin-toolbar .admin-note {
+    margin-left: auto;
+    color: #64748b;
+    font-size: 12px;
+  }
+  .edit-text {
+    width: 100%;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 4px 6px;
+    font-size: 13px;
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+  .edit-select {
+    width: 100%;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 4px 6px;
+    font-size: 12px;
+    font-family: inherit;
+    background: #fff;
+    box-sizing: border-box;
+  }
+  .edit-num {
+    width: 90px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 4px 6px;
+    text-align: right;
+    font-size: 13px;
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+  .edit-num:focus, .edit-text:focus, .edit-select:focus {
+    outline: none;
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 2px rgba(79,70,229,0.15);
+  }
+  .del-btn {
+    background: transparent;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0;
+  }
+  .del-btn:hover { background: #fef2f2; }
+  .add-item-btn {
+    margin-top: 10px;
+    background: transparent;
+    color: #4f46e5;
+    border: 1px dashed #93c5fd;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    width: 100%;
+    font-family: inherit;
+  }
+  .add-item-btn:hover { background: #eef2ff; }
+  .sync-status {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    background: #f1f5f9;
+    color: #64748b;
+    line-height: 1.4;
+  }
+  .sync-status[data-level="ok"]  { background: #d1fae5; color: #065f46; }
+  .sync-status[data-level="err"] { background: #fee2e2; color: #991b1b; }
+  .sync-status[data-level="busy"]{ background: #fef3c7; color: #92400e; }
+  .modal { position: fixed; inset: 0; z-index: 1000; }
+  .modal-bg { position: absolute; inset: 0; background: rgba(15,23,42,0.55); }
+  .modal-box {
+    position: relative;
+    max-width: 640px;
+    margin: 60px auto;
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px 28px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    max-height: calc(100vh - 80px);
+    overflow: auto;
+  }
+  @media (max-width: 720px) { .modal-box { margin: 16px; padding: 18px; } }
+  .modal-box h3 { margin: 0 0 10px; color: #1e293b; }
+  .modal-box code {
+    background: #f1f5f9;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: 'Consolas', monospace;
+    font-size: 12px;
+    color: #4338ca;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>家庭開銷彙整報表</h1>
+  <p>資料來源：家庭開銷.xlsx ・ 涵蓋月份：2025/01 ~ 2026/05 (共 17 個月)</p>
+  <p style="margin-top:6px;font-size:12px;">註：元大銀行自動扣款項目（台新車貸／元大房貸／元大信貸／元大信用卡）一律視為已繳</p>
+</header>
+<main>
+  <div class="stat-grid">
+    <div class="stat"><div class="label">總支出</div><div class="value">NT$ 1,408,886</div><div class="sub">17 個月累計</div></div>
+    <div class="stat"><div class="label">月平均</div><div class="value">NT$ 82,876</div></div>
+    <div class="stat"><div class="label">最高支出月份</div><div class="value">2025/08</div><div class="sub">NT$ 131,747</div></div>
+    <div class="stat"><div class="label">最低支出月份</div><div class="value">2026/05</div><div class="sub">NT$ 51,829</div></div>
+  </div>
+
+      <div class="card">
+    <h2 style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <span>2026 年度每月應繳明細</span>
+      <span style="display:flex;align-items:center;gap:8px;">
+        <span id="syncStatus" class="sync-status" data-level="info">準備中</span>
+        <button id="adminToggleBtn" class="action-btn" type="button">進入管理模式</button>
+      </span>
+    </h2>
+    <p style="color:#64748b;margin:0 0 12px;font-size:13px;">範圍：2026/05 ~ 2026/12；2026/05 為進行中，2026/06 起為尚未到達月份。項目依類別分組，類別之間以空白行分隔。未註明固定金額之項目（信用卡、手機費、水電瓦斯費）金額欄為空白。</p>
+    <div id="adminToolbar" class="admin-toolbar" style="display:none;">
+      <button class="action-btn btn-secondary" type="button" onclick="window.__expCloud.sync()">↻ 從雲端載入</button>
+      <button class="action-btn btn-secondary" type="button" onclick="window.__expCloud.setup()">⚙ 雲端設定</button>
+      <button class="action-btn btn-secondary" type="button" onclick="window.__expCloud.reset()">重設為預設</button>
+      <button class="action-btn btn-secondary" type="button" onclick="window.__expCloud.exportJson()">匯出 JSON</button>
+      <label class="action-btn btn-secondary" style="position:relative;cursor:pointer;">
+        匯入 JSON
+        <input type="file" id="importFile" accept=".json" style="position:absolute;inset:0;opacity:0;cursor:pointer;">
+      </label>
+      <span class="admin-note">變更自動同步至 Google 試算表</span>
+    </div>
+    <div id="y26GridContainer" class="y26-grid"></div>
+  </div><div class="card">
+    <h2>每月總支出趨勢</h2>
+    <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+  </div>
+
+  <div class="row2">
+    <div class="card">
+      <h2>類別佔比</h2>
+      <div class="chart-wrap-sm"><canvas id="catPie"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>類別總計</h2>
+      <table>
+        <thead><tr><th>類別</th><th class="num">總額</th><th class="num">月平均</th><th class="num">佔比</th></tr></thead>
+        <tbody><tr><td><span class='color-dot' style='background:#4f46e5'></span>房貸/車貸</td><td class='num'>569,905</td><td class='num'>33,524</td><td class='num'>40.5%</td></tr><tr><td><span class='color-dot' style='background:#06b6d4'></span>信用卡</td><td class='num'>438,589</td><td class='num'>25,799</td><td class='num'>31.1%</td></tr><tr><td><span class='color-dot' style='background:#10b981'></span>信用貸款</td><td class='num'>101,575</td><td class='num'>5,975</td><td class='num'>7.2%</td></tr><tr><td><span class='color-dot' style='background:#f59e0b'></span>居住-管理/車位</td><td class='num'>84,248</td><td class='num'>4,956</td><td class='num'>6%</td></tr><tr><td><span class='color-dot' style='background:#ef4444'></span>教育/子女</td><td class='num'>83,379</td><td class='num'>4,905</td><td class='num'>5.9%</td></tr><tr><td><span class='color-dot' style='background:#8b5cf6'></span>通訊-手機</td><td class='num'>43,544</td><td class='num'>2,561</td><td class='num'>3.1%</td></tr><tr><td><span class='color-dot' style='background:#ec4899'></span>交通</td><td class='num'>31,023</td><td class='num'>1,825</td><td class='num'>2.2%</td></tr><tr><td><span class='color-dot' style='background:#14b8a6'></span>公用事業-電</td><td class='num'>25,554</td><td class='num'>1,503</td><td class='num'>1.8%</td></tr><tr><td><span class='color-dot' style='background:#84cc16'></span>通訊-市話/網路</td><td class='num'>16,887</td><td class='num'>993</td><td class='num'>1.2%</td></tr><tr><td><span class='color-dot' style='background:#f97316'></span>公用事業-瓦斯</td><td class='num'>8,589</td><td class='num'>505</td><td class='num'>0.6%</td></tr><tr><td><span class='color-dot' style='background:#3b82f6'></span>公用事業-水</td><td class='num'>5,479</td><td class='num'>322</td><td class='num'>0.4%</td></tr><tr><td><span class='color-dot' style='background:#a855f7'></span>稅金/規費</td><td class='num'>114</td><td class='num'>7</td><td class='num'>0%</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>類別 × 月份堆疊</h2>
+    <div class="chart-wrap"><canvas id="stackChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h2>每月支出與繳費狀況</h2>
+    <table>
+      <thead><tr><th>月份</th><th class="num">總支出</th><th class="num">已繳</th><th class="num">未繳</th><th class="num">已繳比率</th></tr></thead>
+      <tbody><tr><td>2025/01</td><td class='num'>64,510</td><td class='num'>63,893</td><td class='num'>617</td><td class='num'>99%</td></tr><tr><td>2025/02</td><td class='num'>57,065</td><td class='num'>57,065</td><td class='num'>0</td><td class='num'>100%</td></tr><tr><td>2025/03</td><td class='num'>59,331</td><td class='num'>59,331</td><td class='num'>0</td><td class='num'>100%</td></tr><tr><td>2025/04</td><td class='num'>96,420</td><td class='num'>96,420</td><td class='num'>0</td><td class='num'>100%</td></tr><tr><td>2025/05</td><td class='num'>74,561</td><td class='num'>74,561</td><td class='num'>0</td><td class='num'>100%</td></tr><tr><td>2025/06</td><td class='num'>61,481</td><td class='num'>61,481</td><td class='num'>0</td><td class='num'>100%</td></tr><tr><td>2025/07</td><td class='num'>83,639</td><td class='num'>83,639</td><td class='num'>0</td><td class='num'>100%</td></tr><tr><td>2025/08</td><td class='num'>131,747</td><td class='num'>131,747</td><td class='num'>0</td><td class='num'>100%</td></tr><tr><td>2025/09</td><td class='num'>77,932</td><td class='num'>77,932</td><td class='num'>0</td><td class='num'>100%</td></tr><tr><td>2025/10</td><td class='num'>105,458</td><td class='num'>105,458</td><td class='num'>0</td><td class='num'>100%</td></tr><tr><td>2025/11</td><td class='num'>94,350</td><td class='num'>94,350</td><td class='num'>0</td><td class='num'>100%</td></tr><tr><td>2025/12</td><td class='num'>78,284</td><td class='num'>78,284</td><td class='num'>0</td><td class='num'>100%</td></tr><tr><td>2026/01</td><td class='num'>71,524</td><td class='num'>70,326</td><td class='num'>1,198</td><td class='num'>98.3%</td></tr><tr><td>2026/02</td><td class='num'>98,679</td><td class='num'>97,057</td><td class='num'>1,622</td><td class='num'>98.4%</td></tr><tr><td>2026/03</td><td class='num'>87,968</td><td class='num'>79,741</td><td class='num'>8,227</td><td class='num'>90.6%</td></tr><tr><td>2026/04</td><td class='num'>114,108</td><td class='num'>114,108</td><td class='num'>0</td><td class='num'>100%</td></tr><tr><td>2026/05</td><td class='num'>51,829</td><td class='num'>36,330</td><td class='num'>15,499</td><td class='num'>70.1%</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>支出項目 Top 20</h2>
+    <table>
+      <thead><tr><th>#</th><th>項目</th><th>類別</th><th class="num">總額</th><th class="num">出現次數</th><th class="num">平均</th></tr></thead>
+      <tbody><tr><td>1</td><td>台新車貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>218,141</td><td class='num'>11</td><td class='num'>19,831</td></tr><tr><td>2</td><td>國泰貸款</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>170,000</td><td class='num'>17</td><td class='num'>10,000</td></tr><tr><td>3</td><td>聯邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>161,151</td><td class='num'>16</td><td class='num'>10,072</td></tr><tr><td>4</td><td>元大房貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>115,764</td><td class='num'>11</td><td class='num'>10,524</td></tr><tr><td>5</td><td>富邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>110,507</td><td class='num'>16</td><td class='num'>6,907</td></tr><tr><td>6</td><td>元大信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>105,637</td><td class='num'>11</td><td class='num'>9,603</td></tr><tr><td>7</td><td>元大房貸</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>66,000</td><td class='num'>6</td><td class='num'>11,000</td></tr><tr><td>8</td><td>元大信貸(元大自動扣款)</td><td><span class='cat-badge'>信用貸款</span></td><td class='num'>65,725</td><td class='num'>11</td><td class='num'>5,975</td></tr><tr><td>9</td><td>永豐信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>61,294</td><td class='num'>13</td><td class='num'>4,715</td></tr><tr><td>10</td><td>車位費</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>37,800</td><td class='num'>9</td><td class='num'>4,200</td></tr><tr><td>11</td><td>元大信貸</td><td><span class='cat-badge'>信用貸款</span></td><td class='num'>35,850</td><td class='num'>6</td><td class='num'>5,975</td></tr><tr><td>12</td><td>格蘭英語</td><td><span class='cat-badge'>教育/子女</span></td><td class='num'>29,750</td><td class='num'>1</td><td class='num'>29,750</td></tr><tr><td>13</td><td>管理費</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>29,648</td><td class='num'>8</td><td class='num'>3,706</td></tr><tr><td>14</td><td>格蘭P1A+2.3.4車費</td><td><span class='cat-badge'>教育/子女</span></td><td class='num'>26,600</td><td class='num'>1</td><td class='num'>26,600</td></tr><tr><td>15</td><td>自小客車牌照稅</td><td><span class='cat-badge'>交通</span></td><td class='num'>26,440</td><td class='num'>2</td><td class='num'>13,220</td></tr><tr><td>16</td><td>電費</td><td><span class='cat-badge'>公用事業-電</span></td><td class='num'>25,554</td><td class='num'>8</td><td class='num'>3,194</td></tr><tr><td>17</td><td>台灣大哥大</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>25,242</td><td class='num'>12</td><td class='num'>2,104</td></tr><tr><td>18</td><td>明道學費</td><td><span class='cat-badge'>教育/子女</span></td><td class='num'>22,309</td><td class='num'>1</td><td class='num'>22,309</td></tr><tr><td>19</td><td>中華電信市話</td><td><span class='cat-badge'>通訊-市話/網路</span></td><td class='num'>16,887</td><td class='num'>13</td><td class='num'>1,299</td></tr><tr><td>20</td><td>車位費-巧</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>16,800</td><td class='num'>4</td><td class='num'>4,200</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>逐月明細（歷史）</h2>
+    <div class="controls">
+      <input id="filterText" type="text" placeholder="搜尋項目關鍵字...">
+      <select id="filterCat">
+        <option value="">全部類別</option>
+<option value='房貸/車貸'>房貸/車貸</option>
+<option value='信用卡'>信用卡</option>
+<option value='信用貸款'>信用貸款</option>
+<option value='居住-管理/車位'>居住-管理/車位</option>
+<option value='教育/子女'>教育/子女</option>
+<option value='通訊-手機'>通訊-手機</option>
+<option value='交通'>交通</option>
+<option value='公用事業-電'>公用事業-電</option>
+<option value='通訊-市話/網路'>通訊-市話/網路</option>
+<option value='公用事業-瓦斯'>公用事業-瓦斯</option>
+<option value='公用事業-水'>公用事業-水</option>
+<option value='稅金/規費'>稅金/規費</option>
+      </select>
+    </div>
+    <div class="month-grid"><section class='month-card' data-month='202501'><h3>2025/01  <span class='month-total'>NT$ 64,510</span></h3><table class='items-table'><thead><tr><th>項目</th><th>類別</th><th class='num'>金額</th><th>已繳</th></tr></thead><tbody><tr><td>元大房貸</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>11,000</td><td><span class='paid'>已繳</span></td></tr><tr><td>國泰貸款</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,000</td><td><span class='paid'>已繳</span></td></tr><tr><td>富邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>7,924</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>7,494</td><td><span class='paid'>已繳</span></td></tr><tr><td>永豐信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>7,022</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信貸</td><td><span class='cat-badge'>信用貸款</span></td><td class='num'>5,975</td><td><span class='paid'>已繳</span></td></tr><tr><td>聯邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>5,173</td><td><span class='paid'>已繳</span></td></tr><tr><td>車位費</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>4,200</td><td><span class='paid'>已繳</span></td></tr><tr><td>管理費</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>3,706</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>1,399</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大-家羽</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>617</td><td><span class='unpaid'>未繳</span></td></tr></tbody></table></section><section class='month-card' data-month='202502'><h3>2025/02  <span class='month-total'>NT$ 57,065</span></h3><table class='items-table'><thead><tr><th>項目</th><th>類別</th><th class='num'>金額</th><th>已繳</th></tr></thead><tbody><tr><td>元大房貸</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>11,000</td><td><span class='paid'>已繳</span></td></tr><tr><td>富邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>10,945</td><td><span class='paid'>已繳</span></td></tr><tr><td>國泰貸款</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,000</td><td><span class='paid'>已繳</span></td></tr><tr><td>永豐信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>9,982</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信貸</td><td><span class='cat-badge'>信用貸款</span></td><td class='num'>5,975</td><td><span class='paid'>已繳</span></td></tr><tr><td>聯邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>4,397</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>1,580</td><td><span class='paid'>已繳</span></td></tr><tr><td>電費</td><td><span class='cat-badge'>公用事業-電</span></td><td class='num'>1,238</td><td><span class='paid'>已繳</span></td></tr><tr><td>瓦斯費</td><td><span class='cat-badge'>公用事業-瓦斯</span></td><td class='num'>1,215</td><td><span class='paid'>已繳</span></td></tr><tr><td>水費</td><td><span class='cat-badge'>公用事業-水</span></td><td class='num'>562</td><td><span class='paid'>已繳</span></td></tr><tr><td>ETC</td><td><span class='cat-badge'>交通</span></td><td class='num'>141</td><td><span class='paid'>已繳</span></td></tr><tr><td>停車費</td><td><span class='cat-badge'>交通</span></td><td class='num'>30</td><td><span class='paid'>已繳</span></td></tr></tbody></table></section><section class='month-card' data-month='202503'><h3>2025/03  <span class='month-total'>NT$ 59,331</span></h3><table class='items-table'><thead><tr><th>項目</th><th>類別</th><th class='num'>金額</th><th>已繳</th></tr></thead><tbody><tr><td>聯邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>12,232</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大房貸</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>11,000</td><td><span class='paid'>已繳</span></td></tr><tr><td>國泰貸款</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,000</td><td><span class='paid'>已繳</span></td></tr><tr><td>永豐信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>6,963</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信貸</td><td><span class='cat-badge'>信用貸款</span></td><td class='num'>5,975</td><td><span class='paid'>已繳</span></td></tr><tr><td>富邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>5,255</td><td><span class='paid'>已繳</span></td></tr><tr><td>車位費</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>4,200</td><td><span class='paid'>已繳</span></td></tr><tr><td>管理費</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>3,706</td><td><span class='paid'>已繳</span></td></tr></tbody></table></section><section class='month-card' data-month='202504'><h3>2025/04  <span class='month-total'>NT$ 96,420</span></h3><table class='items-table'><thead><tr><th>項目</th><th>類別</th><th class='num'>金額</th><th>已繳</th></tr></thead><tbody><tr><td>聯邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>19,909</td><td><span class='paid'>已繳</span></td></tr><tr><td>富邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>19,149</td><td><span class='paid'>已繳</span></td></tr><tr><td>自小客車牌照稅</td><td><span class='cat-badge'>交通</span></td><td class='num'>15,210</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大房貸</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>11,000</td><td><span class='paid'>已繳</span></td></tr><tr><td>國泰貸款</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,000</td><td><span class='paid'>已繳</span></td></tr><tr><td>永豐信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>6,933</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信貸</td><td><span class='cat-badge'>信用貸款</span></td><td class='num'>5,975</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>2,476</td><td><span class='paid'>已繳</span></td></tr><tr><td>大型重機牌照稅</td><td><span class='cat-badge'>交通</span></td><td class='num'>1,620</td><td><span class='paid'>已繳</span></td></tr><tr><td>電費</td><td><span class='cat-badge'>公用事業-電</span></td><td class='num'>1,479</td><td><span class='paid'>已繳</span></td></tr><tr><td>水費</td><td><span class='cat-badge'>公用事業-水</span></td><td class='num'>1,384</td><td><span class='paid'>已繳</span></td></tr><tr><td>瓦斯費</td><td><span class='cat-badge'>公用事業-瓦斯</span></td><td class='num'>1,285</td><td><span class='paid'>已繳</span></td></tr></tbody></table></section><section class='month-card' data-month='202505'><h3>2025/05  <span class='month-total'>NT$ 74,561</span></h3><table class='items-table'><thead><tr><th>項目</th><th>類別</th><th class='num'>金額</th><th>已繳</th></tr></thead><tbody><tr><td>聯邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>15,118</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>13,093</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大房貸</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>11,000</td><td><span class='paid'>已繳</span></td></tr><tr><td>國泰貸款</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,000</td><td><span class='paid'>已繳</span></td></tr><tr><td>永豐信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>6,904</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信貸</td><td><span class='cat-badge'>信用貸款</span></td><td class='num'>5,975</td><td><span class='paid'>已繳</span></td></tr><tr><td>車位費</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>4,200</td><td><span class='paid'>已繳</span></td></tr><tr><td>管理費</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>3,706</td><td><span class='paid'>已繳</span></td></tr><tr><td>富邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>3,266</td><td><span class='paid'>已繳</span></td></tr><tr><td>中華電信市話</td><td><span class='cat-badge'>通訊-市話/網路</span></td><td class='num'>1,299</td><td><span class='paid'>已繳</span></td></tr></tbody></table></section><section class='month-card' data-month='202506'><h3>2025/06  <span class='month-total'>NT$ 61,481</span></h3><table class='items-table'><thead><tr><th>項目</th><th>類別</th><th class='num'>金額</th><th>已繳</th></tr></thead><tbody><tr><td>元大房貸</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>11,000</td><td><span class='paid'>已繳</span></td></tr><tr><td>富邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>10,137</td><td><span class='paid'>已繳</span></td></tr><tr><td>國泰貸款</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,000</td><td><span class='paid'>已繳</span></td></tr><tr><td>聯邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>8,213</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信貸</td><td><span class='cat-badge'>信用貸款</span></td><td class='num'>5,975</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>5,408</td><td><span class='paid'>已繳</span></td></tr><tr><td>永豐信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>2,696</td><td><span class='paid'>已繳</span></td></tr><tr><td>電費</td><td><span class='cat-badge'>公用事業-電</span></td><td class='num'>2,038</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>1,399</td><td><span class='paid'>已繳</span></td></tr><tr><td>中華電信市話</td><td><span class='cat-badge'>通訊-市話/網路</span></td><td class='num'>1,299</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大-洛漢</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>1,198</td><td><span class='paid'>已繳</span></td></tr><tr><td>瓦斯費</td><td><span class='cat-badge'>公用事業-瓦斯</span></td><td class='num'>1,005</td><td><span class='paid'>已繳</span></td></tr><tr><td>水費</td><td><span class='cat-badge'>公用事業-水</span></td><td class='num'>706</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大-家羽</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>407</td><td><span class='paid'>已繳</span></td></tr></tbody></table></section><section class='month-card' data-month='202507'><h3>2025/07  <span class='month-total'>NT$ 83,639</span></h3><table class='items-table'><thead><tr><th>項目</th><th>類別</th><th class='num'>金額</th><th>已繳</th></tr></thead><tbody><tr><td>台新車貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>19,831</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>11,926</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大房貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,524</td><td><span class='paid'>已繳</span></td></tr><tr><td>國泰貸款</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,000</td><td><span class='paid'>已繳</span></td></tr><tr><td>聯邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>7,924</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信貸(元大自動扣款)</td><td><span class='cat-badge'>信用貸款</span></td><td class='num'>5,975</td><td><span class='paid'>已繳</span></td></tr><tr><td>車位費</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>4,200</td><td><span class='paid'>已繳</span></td></tr><tr><td>管理費</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>3,706</td><td><span class='paid'>已繳</span></td></tr><tr><td>富邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>3,270</td><td><span class='paid'>已繳</span></td></tr><tr><td>永豐信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>2,666</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>1,399</td><td><span class='paid'>已繳</span></td></tr><tr><td>中華電信市話</td><td><span class='cat-badge'>通訊-市話/網路</span></td><td class='num'>1,299</td><td><span class='paid'>已繳</span></td></tr><tr><td>大型重機燃料稅</td><td><span class='cat-badge'>交通</span></td><td class='num'>900</td><td><span class='paid'>已繳</span></td></tr><tr><td>ETC</td><td><span class='cat-badge'>交通</span></td><td class='num'>19</td><td><span class='paid'>已繳</span></td></tr></tbody></table></section><section class='month-card' data-month='202508'><h3>2025/08  <span class='month-total'>NT$ 131,747</span></h3><table class='items-table'><thead><tr><th>項目</th><th>類別</th><th class='num'>金額</th><th>已繳</th></tr></thead><tbody><tr><td>格蘭英語</td><td><span class='cat-badge'>教育/子女</span></td><td class='num'>29,750</td><td><span class='paid'>已繳</span></td></tr><tr><td>明道學費</td><td><span class='cat-badge'>教育/子女</span></td><td class='num'>22,309</td><td><span class='paid'>已繳</span></td></tr><tr><td>台新車貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>19,831</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大房貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,524</td><td><span class='paid'>已繳</span></td></tr><tr><td>聯邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>10,433</td><td><span class='paid'>已繳</span></td></tr><tr><td>國泰貸款</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,000</td><td><span class='paid'>已繳</span></td></tr><tr><td>富邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>8,206</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信貸(元大自動扣款)</td><td><span class='cat-badge'>信用貸款</span></td><td class='num'>5,975</td><td><span class='paid'>已繳</span></td></tr><tr><td>電費</td><td><span class='cat-badge'>公用事業-電</span></td><td class='num'>5,317</td><td><span class='paid'>已繳</span></td></tr><tr><td>永豐信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>2,637</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大-洛漢</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>1,499</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>1,399</td><td><span class='paid'>已繳</span></td></tr><tr><td>中華電信市話</td><td><span class='cat-badge'>通訊-市話/網路</span></td><td class='num'>1,299</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大-家羽</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>1,095</td><td><span class='paid'>已繳</span></td></tr><tr><td>瓦斯費</td><td><span class='cat-badge'>公用事業-瓦斯</span></td><td class='num'>854</td><td><span class='paid'>已繳</span></td></tr><tr><td>水費</td><td><span class='cat-badge'>公用事業-水</span></td><td class='num'>532</td><td><span class='paid'>已繳</span></td></tr><tr><td>ETC</td><td><span class='cat-badge'>交通</span></td><td class='num'>87</td><td><span class='paid'>已繳</span></td></tr></tbody></table></section><section class='month-card' data-month='202509'><h3>2025/09  <span class='month-total'>NT$ 77,932</span></h3><table class='items-table'><thead><tr><th>項目</th><th>類別</th><th class='num'>金額</th><th>已繳</th></tr></thead><tbody><tr><td>台新車貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>19,831</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大房貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,524</td><td><span class='paid'>已繳</span></td></tr><tr><td>國泰貸款</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,000</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>7,529</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信貸(元大自動扣款)</td><td><span class='cat-badge'>信用貸款</span></td><td class='num'>5,975</td><td><span class='paid'>已繳</span></td></tr><tr><td>富邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>5,068</td><td><span class='paid'>已繳</span></td></tr><tr><td>車位費</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>4,200</td><td><span class='paid'>已繳</span></td></tr><tr><td>管理費</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>3,706</td><td><span class='paid'>已繳</span></td></tr><tr><td>聯邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>3,616</td><td><span class='paid'>已繳</span></td></tr><tr><td>永豐信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>3,206</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>1,649</td><td><span class='paid'>已繳</span></td></tr><tr><td>中華電信市話</td><td><span class='cat-badge'>通訊-市話/網路</span></td><td class='num'>1,299</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大-家羽</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>627</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大-洛漢</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>599</td><td><span class='paid'>已繳</span></td></tr><tr><td>ETC</td><td><span class='cat-badge'>交通</span></td><td class='num'>103</td><td><span class='paid'>已繳</span></td></tr></tbody></table></section><section class='month-card' data-month='202510'><h3>2025/10  <span class='month-total'>NT$ 105,458</span></h3><table class='items-table'><thead><tr><th>項目</th><th>類別</th><th class='num'>金額</th><th>已繳</th></tr></thead><tbody><tr><td>元大信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>19,874</td><td><span class='paid'>已繳</span></td></tr><tr><td>台新車貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>19,831</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大房貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,524</td><td><span class='paid'>已繳</span></td></tr><tr><td>國泰貸款</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,000</td><td><span class='paid'>已繳</span></td></tr><tr><td>聯邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>9,981</td><td><span class='paid'>已繳</span></td></tr><tr><td>電費</td><td><span class='cat-badge'>公用事業-電</span></td><td class='num'>6,953</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信貸(元大自動扣款)</td><td><span class='cat-badge'>信用貸款</span></td><td class='num'>5,975</td><td><span class='paid'>已繳</span></td></tr><tr><td>富邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>4,940</td><td><span class='paid'>已繳</span></td></tr><tr><td>永豐信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>4,743</td><td><span class='paid'>已繳</span></td></tr><tr><td>車位費-巧</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>4,200</td><td><span class='paid'>已繳</span></td></tr><tr><td>格蘭9-10月交通費</td><td><span class='cat-badge'>教育/子女</span></td><td class='num'>3,200</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>1,399</td><td><span class='paid'>已繳</span></td></tr><tr><td>中華電信市話</td><td><span class='cat-badge'>通訊-市話/網路</span></td><td class='num'>1,299</td><td><span class='paid'>已繳</span></td></tr><tr><td>瓦斯費</td><td><span class='cat-badge'>公用事業-瓦斯</span></td><td class='num'>865</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大-洛漢</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>602</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大-家羽</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>599</td><td><span class='paid'>已繳</span></td></tr><tr><td>水費</td><td><span class='cat-badge'>公用事業-水</span></td><td class='num'>473</td><td><span class='paid'>已繳</span></td></tr></tbody></table></section><section class='month-card' data-month='202511'><h3>2025/11  <span class='month-total'>NT$ 94,350</span></h3><table class='items-table'><thead><tr><th>項目</th><th>類別</th><th class='num'>金額</th><th>已繳</th></tr></thead><tbody><tr><td>台新車貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>19,831</td><td><span class='paid'>已繳</span></td></tr><tr><td>聯邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>16,775</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大房貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,524</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>10,321</td><td><span class='paid'>已繳</span></td></tr><tr><td>國泰貸款</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,000</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信貸(元大自動扣款)</td><td><span class='cat-badge'>信用貸款</span></td><td class='num'>5,975</td><td><span class='paid'>已繳</span></td></tr><tr><td>富邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>4,940</td><td><span class='paid'>已繳</span></td></tr><tr><td>車位費</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>4,200</td><td><span class='paid'>已繳</span></td></tr><tr><td>管理費</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>3,706</td><td><span class='paid'>已繳</span></td></tr><tr><td>永豐信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>2,537</td><td><span class='paid'>已繳</span></td></tr><tr><td>格蘭11月交通費</td><td><span class='cat-badge'>教育/子女</span></td><td class='num'>1,520</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>1,399</td><td><span class='paid'>已繳</span></td></tr><tr><td>中華電信市話</td><td><span class='cat-badge'>通訊-市話/網路</span></td><td class='num'>1,299</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大-家羽</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>610</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大-洛漢</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>599</td><td><span class='paid'>已繳</span></td></tr><tr><td>地價稅</td><td><span class='cat-badge'>稅金/規費</span></td><td class='num'>114</td><td><span class='paid'>已繳</span></td></tr></tbody></table></section><section class='month-card' data-month='202512'><h3>2025/12  <span class='month-total'>NT$ 78,284</span></h3><table class='items-table'><thead><tr><th>項目</th><th>類別</th><th class='num'>金額</th><th>已繳</th></tr></thead><tbody><tr><td>台新車貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>19,831</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大房貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,524</td><td><span class='paid'>已繳</span></td></tr><tr><td>國泰貸款</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,000</td><td><span class='paid'>已繳</span></td></tr><tr><td>聯邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>9,625</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信貸(元大自動扣款)</td><td><span class='cat-badge'>信用貸款</span></td><td class='num'>5,975</td><td><span class='paid'>已繳</span></td></tr><tr><td>電費</td><td><span class='cat-badge'>公用事業-電</span></td><td class='num'>5,535</td><td><span class='paid'>已繳</span></td></tr><tr><td>富邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>4,528</td><td><span class='paid'>已繳</span></td></tr><tr><td>車位費-巧</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>4,200</td><td><span class='paid'>已繳</span></td></tr><tr><td>永豐信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>2,517</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>1,399</td><td><span class='paid'>已繳</span></td></tr><tr><td>中華電信市話</td><td><span class='cat-badge'>通訊-市話/網路</span></td><td class='num'>1,299</td><td><span class='paid'>已繳</span></td></tr><tr><td>瓦斯費</td><td><span class='cat-badge'>公用事業-瓦斯</span></td><td class='num'>935</td><td><span class='paid'>已繳</span></td></tr><tr><td>水費</td><td><span class='cat-badge'>公用事業-水</span></td><td class='num'>718</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大-洛漢</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>599</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大-家羽</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>599</td><td><span class='paid'>已繳</span></td></tr></tbody></table></section><section class='month-card' data-month='202601'><h3>2026/01  <span class='month-total'>NT$ 71,524</span></h3><table class='items-table'><thead><tr><th>項目</th><th>類別</th><th class='num'>金額</th><th>已繳</th></tr></thead><tbody><tr><td>台新車貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>19,831</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大房貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,524</td><td><span class='paid'>已繳</span></td></tr><tr><td>國泰貸款</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,000</td><td><span class='paid'>已繳</span></td></tr><tr><td>聯邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>6,320</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信貸(元大自動扣款)</td><td><span class='cat-badge'>信用貸款</span></td><td class='num'>5,975</td><td><span class='paid'>已繳</span></td></tr><tr><td>富邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>4,521</td><td><span class='paid'>已繳</span></td></tr><tr><td>車位費</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>4,200</td><td><span class='paid'>已繳</span></td></tr><tr><td>管理費</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>3,706</td><td><span class='paid'>已繳</span></td></tr><tr><td>永豐信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>2,488</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>1,399</td><td><span class='paid'>已繳</span></td></tr><tr><td>中華電信市話</td><td><span class='cat-badge'>通訊-市話/網路</span></td><td class='num'>1,299</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大-洛漢</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>599</td><td><span class='unpaid'>未繳</span></td></tr><tr><td>台灣大哥大-家羽</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>599</td><td><span class='unpaid'>未繳</span></td></tr><tr><td>ETC</td><td><span class='cat-badge'>交通</span></td><td class='num'>63</td><td><span class='paid'>已繳</span></td></tr></tbody></table></section><section class='month-card' data-month='202602'><h3>2026/02  <span class='month-total'>NT$ 98,679</span></h3><table class='items-table'><thead><tr><th>項目</th><th>類別</th><th class='num'>金額</th><th>已繳</th></tr></thead><tbody><tr><td>元大信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>20,703</td><td><span class='paid'>已繳</span></td></tr><tr><td>台新車貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>19,831</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大房貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,524</td><td><span class='paid'>已繳</span></td></tr><tr><td>國泰貸款</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,000</td><td><span class='paid'>已繳</span></td></tr><tr><td>富邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>7,052</td><td><span class='paid'>已繳</span></td></tr><tr><td>聯邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>6,976</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信貸(元大自動扣款)</td><td><span class='cat-badge'>信用貸款</span></td><td class='num'>5,975</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>5,724</td><td><span class='paid'>已繳</span></td></tr><tr><td>車位費-巧</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>4,200</td><td><span class='paid'>已繳</span></td></tr><tr><td>電費</td><td><span class='cat-badge'>公用事業-電</span></td><td class='num'>1,624</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大-家羽</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>1,622</td><td><span class='unpaid'>未繳</span></td></tr><tr><td>台灣大哥大-洛漢</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>1,358</td><td><span class='paid'>已繳</span></td></tr><tr><td>中華電信市話</td><td><span class='cat-badge'>通訊-市話/網路</span></td><td class='num'>1,299</td><td><span class='paid'>已繳</span></td></tr><tr><td>瓦斯費</td><td><span class='cat-badge'>公用事業-瓦斯</span></td><td class='num'>1,239</td><td><span class='paid'>已繳</span></td></tr><tr><td>水費</td><td><span class='cat-badge'>公用事業-水</span></td><td class='num'>552</td><td><span class='paid'>已繳</span></td></tr></tbody></table></section><section class='month-card' data-month='202603'><h3>2026/03  <span class='month-total'>NT$ 87,968</span></h3><table class='items-table'><thead><tr><th>項目</th><th>類別</th><th class='num'>金額</th><th>已繳</th></tr></thead><tbody><tr><td>台新車貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>19,831</td><td><span class='paid'>已繳</span></td></tr><tr><td>聯邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>16,131</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大房貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,524</td><td><span class='paid'>已繳</span></td></tr><tr><td>國泰貸款</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,000</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信貸(元大自動扣款)</td><td><span class='cat-badge'>信用貸款</span></td><td class='num'>5,975</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>5,233</td><td><span class='paid'>已繳</span></td></tr><tr><td>富邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>4,521</td><td><span class='unpaid'>未繳</span></td></tr><tr><td>車位費</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>4,200</td><td><span class='paid'>已繳</span></td></tr><tr><td>管理費</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>3,706</td><td><span class='unpaid'>未繳</span></td></tr><tr><td>台灣大哥大</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>3,355</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大-家羽</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>2,514</td><td><span class='paid'>已繳</span></td></tr><tr><td>中華電信市話</td><td><span class='cat-badge'>通訊-市話/網路</span></td><td class='num'>1,299</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大-洛漢</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>679</td><td><span class='paid'>已繳</span></td></tr></tbody></table></section><section class='month-card' data-month='202604'><h3>2026/04  <span class='month-total'>NT$ 114,108</span></h3><table class='items-table'><thead><tr><th>項目</th><th>類別</th><th class='num'>金額</th><th>已繳</th></tr></thead><tbody><tr><td>格蘭P1A+2.3.4車費</td><td><span class='cat-badge'>教育/子女</span></td><td class='num'>26,600</td><td><span class='paid'>已繳</span></td></tr><tr><td>台新車貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>19,831</td><td><span class='paid'>已繳</span></td></tr><tr><td>自小客車牌照稅</td><td><span class='cat-badge'>交通</span></td><td class='num'>11,230</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大房貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,524</td><td><span class='paid'>已繳</span></td></tr><tr><td>國泰貸款</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,000</td><td><span class='paid'>已繳</span></td></tr><tr><td>聯邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>8,328</td><td><span class='paid'>已繳</span></td></tr><tr><td>富邦信用卡</td><td><span class='cat-badge'>信用卡</span></td><td class='num'>6,785</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大信貸(元大自動扣款)</td><td><span class='cat-badge'>信用貸款</span></td><td class='num'>5,975</td><td><span class='paid'>已繳</span></td></tr><tr><td>車位費-巧</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>4,200</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>3,322</td><td><span class='paid'>已繳</span></td></tr><tr><td>大型重機牌照稅</td><td><span class='cat-badge'>交通</span></td><td class='num'>1,620</td><td><span class='paid'>已繳</span></td></tr><tr><td>電費</td><td><span class='cat-badge'>公用事業-電</span></td><td class='num'>1,370</td><td><span class='paid'>已繳</span></td></tr><tr><td>中華電信市話</td><td><span class='cat-badge'>通訊-市話/網路</span></td><td class='num'>1,299</td><td><span class='paid'>已繳</span></td></tr><tr><td>瓦斯費</td><td><span class='cat-badge'>公用事業-瓦斯</span></td><td class='num'>1,191</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大-洛漢</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>679</td><td><span class='paid'>已繳</span></td></tr><tr><td>台灣大哥大-家羽</td><td><span class='cat-badge'>通訊-手機</span></td><td class='num'>602</td><td><span class='paid'>已繳</span></td></tr><tr><td>水費</td><td><span class='cat-badge'>公用事業-水</span></td><td class='num'>552</td><td><span class='paid'>已繳</span></td></tr></tbody></table></section><section class='month-card' data-month='202605'><h3>2026/05  <span class='month-total'>NT$ 51,829</span></h3><table class='items-table'><thead><tr><th>項目</th><th>類別</th><th class='num'>金額</th><th>已繳</th></tr></thead><tbody><tr><td>台新車貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>19,831</td><td><span class='paid'>已繳</span></td></tr><tr><td>元大房貸(元大自動扣款)</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,524</td><td><span class='paid'>已繳</span></td></tr><tr><td>國泰貸款</td><td><span class='cat-badge'>房貸/車貸</span></td><td class='num'>10,000</td><td><span class='unpaid'>未繳</span></td></tr><tr><td>元大信貸(元大自動扣款)</td><td><span class='cat-badge'>信用貸款</span></td><td class='num'>5,975</td><td><span class='paid'>已繳</span></td></tr><tr><td>車位費</td><td><span class='cat-badge'>居住-管理/車位</span></td><td class='num'>4,200</td><td><span class='unpaid'>未繳</span></td></tr><tr><td>中華電信市話</td><td><span class='cat-badge'>通訊-市話/網路</span></td><td class='num'>1,299</td><td><span class='unpaid'>未繳</span></td></tr></tbody></table></section></div>
+  </div>
+</main>
+<footer>由 PowerShell + Chart.js 自動產生 ・ 2026/05/11 17:00</footer>
+
+<script>
+const monthLabels = ["2025/01","2025/02","2025/03","2025/04","2025/05","2025/06","2025/07","2025/08","2025/09","2025/10","2025/11","2025/12","2026/01","2026/02","2026/03","2026/04","2026/05"];
+const monthTotals = [64510,57065,59331,96420,74561,61481,83639,131747,77932,105458,94350,78284,71524,98679,87968,114108,51829];
+const catLabels = ["房貸/車貸","信用卡","信用貸款","居住-管理/車位","教育/子女","通訊-手機","交通","公用事業-電","通訊-市話/網路","公用事業-瓦斯","公用事業-水","稅金/規費"];
+const catTotals = [569905,438589,101575,84248,83379,43544,31023,25554,16887,8589,5479,114];
+const catColors = ["#4f46e5","#06b6d4","#10b981","#f59e0b","#ef4444","#8b5cf6","#ec4899","#14b8a6","#84cc16","#f97316","#3b82f6","#a855f7"];
+const stackedDatasets = [{"label":"房貸/車貸","data":[21000,21000,21000,21000,21000,21000,40355,40355,40355,40355,40355,40355,40355,40355,40355,40355,40355],"backgroundColor":"#4f46e5"},{"label":"信用卡","data":[27613,26904,24450,48467,38381,26454,25786,21276,19419,39538,34573,16670,13329,34731,25885,15113,0],"backgroundColor":"#06b6d4"},{"label":"信用貸款","data":[5975,5975,5975,5975,5975,5975,5975,5975,5975,5975,5975,5975,5975,5975,5975,5975,5975],"backgroundColor":"#10b981"},{"label":"居住-管理/車位","data":[7906,0,7906,0,7906,0,7906,0,7906,4200,7906,4200,7906,4200,7906,4200,4200],"backgroundColor":"#f59e0b"},{"label":"教育/子女","data":[0,0,0,0,0,0,0,52059,0,3200,1520,0,0,0,0,26600,0],"backgroundColor":"#ef4444"},{"label":"通訊-手機","data":[2016,0,0,0,0,3004,1399,3993,2875,2600,2608,2597,2597,8704,6548,4603,0],"backgroundColor":"#8b5cf6"},{"label":"交通","data":[0,171,0,16830,0,0,919,87,103,0,0,0,63,0,0,12850,0],"backgroundColor":"#ec4899"},{"label":"公用事業-電","data":[0,1238,0,1479,0,2038,0,5317,0,6953,0,5535,0,1624,0,1370,0],"backgroundColor":"#14b8a6"},{"label":"通訊-市話/網路","data":[0,0,0,0,1299,1299,1299,1299,1299,1299,1299,1299,1299,1299,1299,1299,1299],"backgroundColor":"#84cc16"},{"label":"公用事業-瓦斯","data":[0,1215,0,1285,0,1005,0,854,0,865,0,935,0,1239,0,1191,0],"backgroundColor":"#f97316"},{"label":"公用事業-水","data":[0,562,0,1384,0,706,0,532,0,473,0,718,0,552,0,552,0],"backgroundColor":"#3b82f6"},{"label":"稅金/規費","data":[0,0,0,0,0,0,0,0,0,0,114,0,0,0,0,0,0],"backgroundColor":"#a855f7"}];
+
+const moneyFmt = v => 'NT$ ' + Math.round(v).toLocaleString();
+
+new Chart(document.getElementById('trendChart'), {
+  type: 'bar',
+  data: {
+    labels: monthLabels,
+    datasets: [{
+      label: '月支出',
+      data: monthTotals,
+      backgroundColor: 'rgba(79,70,229,0.85)',
+      borderRadius: 6
+    }, {
+      type: 'line',
+      label: '平均線',
+      data: monthLabels.map(() => monthTotals.reduce((a,b)=>a+b,0)/monthTotals.length),
+      borderColor: '#ef4444',
+      backgroundColor: 'transparent',
+      borderDash: [6,4],
+      pointRadius: 0,
+      tension: 0
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'top' },
+      tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + moneyFmt(ctx.parsed.y) } }
+    },
+    scales: { y: { ticks: { callback: v => moneyFmt(v) }, beginAtZero: true } }
+  }
+});
+
+new Chart(document.getElementById('catPie'), {
+  type: 'doughnut',
+  data: {
+    labels: catLabels,
+    datasets: [{ data: catTotals, backgroundColor: catColors }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'right' },
+      tooltip: { callbacks: { label: ctx => ctx.label + ': ' + moneyFmt(ctx.parsed) } }
+    }
+  }
+});
+
+new Chart(document.getElementById('stackChart'), {
+  type: 'bar',
+  data: { labels: monthLabels, datasets: stackedDatasets },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + moneyFmt(ctx.parsed.y) } }
+    },
+    scales: {
+      x: { stacked: true },
+      y: { stacked: true, ticks: { callback: v => moneyFmt(v) } }
+    }
+  }
+});
+
+const ft = document.getElementById('filterText');
+const fc = document.getElementById('filterCat');
+function applyFilter() {
+  const q = ft.value.trim().toLowerCase();
+  const cat = fc.value;
+  document.querySelectorAll('.month-card .items-table tbody tr').forEach(tr => {
+    const item = (tr.cells[0].innerText || '').toLowerCase();
+    const c = tr.cells[1].innerText || '';
+    const okText = !q || item.includes(q);
+    const okCat = !cat || c === cat;
+    tr.style.display = (okText && okCat) ? '' : 'none';
+  });
+}
+ft.addEventListener('input', applyFilter);
+fc.addEventListener('change', applyFilter);
+</script>
+
+<div id="setupModal" class="modal" style="display:none;">
+  <div class="modal-bg" onclick="window.__expCloud.setupClose()"></div>
+  <div class="modal-box">
+    <h3>雲端同步設定</h3>
+    <p style="color:#475569;font-size:13px;margin:0 0 10px;">資料將存於你 Google 帳號下的試算表，可在不同電腦上同帳號登入 Chrome 自動同步。</p>
+    <details style="margin:10px 0 14px;">
+      <summary style="cursor:pointer;color:#4f46e5;font-size:13px;font-weight:600;">首次設定步驟（點此展開）</summary>
+      <ol style="font-size:13px;color:#475569;line-height:1.8;padding-left:20px;margin:8px 0 0;">
+        <li>到 <a href="https://sheets.new" target="_blank">sheets.new</a> 建立新試算表</li>
+        <li>選單：擴充功能 → Apps Script</li>
+        <li>把編輯區內容清空，貼上專案中 <code>家庭開銷-AppsScript.gs</code> 的內容後存檔</li>
+        <li>點上方「部署」→「新增部署作業」</li>
+        <li>類型選「網頁應用程式」</li>
+        <li>「執行身分」選「我」、「存取權」選「<b>知道連結的任何人</b>」</li>
+        <li>點「部署」並完成授權（出現未驗證警告 → 進階 → 前往未驗證的應用程式）</li>
+        <li>複製顯示的「網路應用程式 URL」</li>
+        <li>把 URL 貼到下方欄位，按「測試並儲存」</li>
+      </ol>
+    </details>
+    <label style="display:block;font-size:13px;color:#475569;margin-bottom:4px;">Web App URL：</label>
+    <input type="text" id="setupUrl" placeholder="https://script.google.com/macros/s/.../exec" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-family:'Consolas',monospace;font-size:12px;box-sizing:border-box;">
+    <p id="setupMsg" style="margin:8px 0 0;font-size:12px;color:#64748b;min-height:18px;"></p>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;">
+      <button class="action-btn btn-secondary" type="button" onclick="window.__expCloud.openInTab()">在新分頁開啟測試</button>
+      <button class="action-btn btn-secondary" type="button" onclick="window.__expCloud.setupClose()">取消</button>
+      <button class="action-btn btn-secondary" type="button" onclick="window.__expCloud.clearUrl()" style="color:#dc2626;border-color:#fecaca;">清除設定</button>
+      <button class="action-btn" type="button" onclick="window.__expCloud.setupSave()">測試並儲存</button>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  var CONFIG_KEY = 'family-expenses-config-v1';
+  var CACHE_KEY  = 'family-expenses-cache-v1';
+
+  var TPL_EVERY = [
+    { item: '台新車貸', cat: '房貸/車貸', amount: 19831, paid: false },
+    { item: '國泰貸款', cat: '房貸/車貸', amount: 10000, paid: false },
+    { item: '元大房貸', cat: '房貸/車貸', amount: 10524, paid: false },
+    { item: '元大信貸', cat: '信用貸款', amount: 5975, paid: false },
+    { item: '聯邦信用卡(結帳日27)', cat: '信用卡', amount: null, paid: false },
+    { item: '元大信用卡(結帳日06)', cat: '信用卡', amount: null, paid: false },
+    { item: '永豐信用卡(結帳日14)', cat: '信用卡', amount: null, paid: false },
+    { item: '富邦信用卡(結帳日16)', cat: '信用卡', amount: null, paid: false },
+    { item: '中華電信網路', cat: '通訊-市話/網路', amount: 1299, paid: false },
+    { item: '台灣大哥大-毓辰', cat: '通訊-手機', amount: null, paid: false },
+    { item: '台灣大哥大-洛漢', cat: '通訊-手機', amount: null, paid: false },
+    { item: '台灣大哥大-家羽', cat: '通訊-手機', amount: null, paid: false }
+  ];
+  var TPL_ODD = [
+    { item: '管理費', cat: '居住-管理/車位', amount: 3706, paid: false },
+    { item: '車位費BZN-9931', cat: '居住-管理/車位', amount: 4200, paid: false }
+  ];
+  var TPL_EVEN = [
+    { item: '車位費CAB-9331', cat: '居住-管理/車位', amount: 4200, paid: false },
+    { item: '電費', cat: '公用事業-電', amount: null, paid: false },
+    { item: '水費', cat: '公用事業-水', amount: null, paid: false },
+    { item: '瓦斯費', cat: '公用事業-瓦斯', amount: null, paid: false }
+  ];
+  var CAT_ORDER = ['房貸/車貸','信用貸款','信用卡','居住-管理/車位','公用事業-電','公用事業-水','公用事業-瓦斯','通訊-市話/網路','通訊-手機','居住-房租','教育/子女','交通','稅金/規費','醫療','保險','其他'];
+
+  function buildDefault(){
+    var out = {};
+    for (var m = 5; m <= 12; m++){
+      var key = '2026-' + String(m).padStart(2,'0');
+      var list = TPL_EVERY.map(function(x){ return Object.assign({}, x); });
+      var extra = (m % 2 === 1) ? TPL_ODD : TPL_EVEN;
+      extra.forEach(function(x){ list.push(Object.assign({}, x)); });
+      out[key] = list;
+    }
+    return out;
+  }
+
+  function loadConfig(){
+    try { var s = localStorage.getItem(CONFIG_KEY); if (s) return JSON.parse(s); } catch(e){}
+    return { url: '' };
+  }
+  function saveConfig(){ localStorage.setItem(CONFIG_KEY, JSON.stringify(CONFIG)); }
+  function loadCache(){
+    try { var s = localStorage.getItem(CACHE_KEY); if (s) { var c = JSON.parse(s); if (c && c.schedule) return c.schedule; } } catch(e){}
+    return buildDefault();
+  }
+  function saveCache(){
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ schedule: SCHEDULE, ts: Date.now() })); } catch(e){}
+  }
+
+  var CONFIG    = loadConfig();
+  var SCHEDULE  = loadCache();
+  var adminMode = false;
+  var saveTimer = null;
+  var savingNow = false;
+  var pendingPush = false;
+
+  function escapeHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
+    });
+  }
+  function fmtMoney(v){
+    if (v === null || v === undefined || v === '') return '';
+    return Number(v).toLocaleString();
+  }
+  function getMonthState(mNum){
+    var today = new Date();
+    var y = today.getFullYear(), m = today.getMonth() + 1;
+    if (y > 2026) return 'past';
+    if (y < 2026) return 'future';
+    if (m > mNum) return 'past';
+    if (m === mNum) return 'current';
+    return 'future';
+  }
+
+  function showStatus(text, level){
+    var el = document.getElementById('syncStatus');
+    if (!el) return;
+    el.textContent = text;
+    el.dataset.level = level || 'info';
+  }
+  function setSetupMsg(text, color){
+    var el = document.getElementById('setupMsg');
+    if (!el) return;
+    el.textContent = text || '';
+    el.style.color = color || '#64748b';
+  }
+
+  function renderSchedule(){
+    var grid = document.getElementById('y26GridContainer');
+    if (!grid) return;
+    var keys = Object.keys(SCHEDULE).sort();
+    grid.innerHTML = keys.map(function(k){ return renderMonthCard(k, SCHEDULE[k]); }).join('');
+  }
+  function renderMonthCard(monthKey, items){
+    var parts = monthKey.split('-');
+    var yy = parts[0], mm = parts[1];
+    var mNum = parseInt(mm, 10);
+    var label = yy + '/' + mm;
+    var state = getMonthState(mNum);
+    var stateLabel = state === 'past' ? '已結束' : (state === 'current' ? '進行中' : '未到達');
+    var stateClass = 'state-' + state;
+
+    var grouped = {};
+    items.forEach(function(it, idx){
+      var cat = it.cat || '其他';
+      (grouped[cat] = grouped[cat] || []).push(Object.assign({}, it, { _idx: idx }));
+    });
+    var ordered = CAT_ORDER.filter(function(c){ return grouped[c]; });
+    Object.keys(grouped).forEach(function(c){ if (CAT_ORDER.indexOf(c) < 0) ordered.push(c); });
+
+    var fixedSum = items.reduce(function(s, it){
+      return s + (it.amount != null && it.amount !== '' ? Number(it.amount) : 0);
+    }, 0);
+
+    var colCount = adminMode ? 5 : 4;
+    var body = '';
+    var first = true;
+    ordered.forEach(function(cat){
+      var arr = grouped[cat];
+      if (!arr || arr.length === 0) return;
+      if (!first) body += '<tr class="cat-sep"><td colspan="' + colCount + '"></td></tr>';
+      arr.forEach(function(it){ body += renderRow(monthKey, it, state); });
+      first = false;
+    });
+
+    var headExtra = adminMode ? '<th style="width:36px;"></th>' : '';
+    var addBtn = adminMode ? '<button class="add-item-btn" type="button" onclick="window.__expAdm.add(\'' + monthKey + '\')">+ 新增項目</button>' : '';
+
+    return '<section class="y26-card ' + stateClass + '">' +
+      '<h3>' + label + ' <span class="state-badge ' + stateClass + '">' + stateLabel + '</span><span class="month-total">固定 NT$ ' + fmtMoney(fixedSum) + '</span></h3>' +
+      '<table class="items-table"><thead><tr><th>項目</th><th>類別</th><th class="num">金額</th><th>已繳</th>' + headExtra + '</tr></thead><tbody>' + body + '</tbody></table>' +
+      addBtn +
+    '</section>';
+  }
+  function renderRow(monthKey, it, monthState){
+    if (!adminMode){
+      var paidCell = '';
+      if (it.amount != null && it.amount !== ''){
+        if (it.paid) paidCell = '<span class="paid">已繳</span>';
+        else if (monthState === 'past') paidCell = '<span class="unpaid">未繳</span>';
+      } else if (it.paid){
+        paidCell = '<span class="paid">已繳</span>';
+      }
+      return '<tr>' +
+        '<td>' + escapeHtml(it.item) + '</td>' +
+        '<td><span class="cat-badge">' + escapeHtml(it.cat) + '</span></td>' +
+        '<td class="num">' + fmtMoney(it.amount) + '</td>' +
+        '<td>' + paidCell + '</td>' +
+      '</tr>';
+    }
+    var opts = CAT_ORDER.map(function(c){
+      return '<option' + (c === it.cat ? ' selected' : '') + '>' + escapeHtml(c) + '</option>';
+    }).join('');
+    if (CAT_ORDER.indexOf(it.cat) < 0 && it.cat) {
+      opts = '<option selected>' + escapeHtml(it.cat) + '</option>' + opts;
+    }
+    return '<tr>' +
+      '<td><input type="text" class="edit-text" value="' + escapeHtml(it.item) + '" oninput="window.__expAdm.upd(\'' + monthKey + '\',' + it._idx + ',\'item\',this.value)"></td>' +
+      '<td><select class="edit-select" onchange="window.__expAdm.updCat(\'' + monthKey + '\',' + it._idx + ',this.value)">' + opts + '</select></td>' +
+      '<td class="num"><input type="number" class="edit-num" value="' + (it.amount == null ? '' : it.amount) + '" placeholder="留空" oninput="window.__expAdm.updAmount(\'' + monthKey + '\',' + it._idx + ',this.value)"></td>' +
+      '<td><input type="checkbox" ' + (it.paid ? 'checked' : '') + ' onchange="window.__expAdm.updPaid(\'' + monthKey + '\',' + it._idx + ',this.checked)"></td>' +
+      '<td><button class="del-btn" type="button" onclick="window.__expAdm.del(\'' + monthKey + '\',' + it._idx + ')" title="刪除">×</button></td>' +
+    '</tr>';
+  }
+
+  function upd(monthKey, idx, field, val){
+    if (!SCHEDULE[monthKey] || !SCHEDULE[monthKey][idx]) return;
+    SCHEDULE[monthKey][idx][field] = val;
+    schedulePush();
+  }
+  function updCat(monthKey, idx, val){ upd(monthKey, idx, 'cat', val); renderSchedule(); }
+  function updAmount(monthKey, idx, val){
+    var num = val === '' ? null : Number(val);
+    upd(monthKey, idx, 'amount', num);
+    renderMonthTotalOnly(monthKey);
+  }
+  function updPaid(monthKey, idx, val){ upd(monthKey, idx, 'paid', val); }
+  function renderMonthTotalOnly(monthKey){
+    var sections = document.querySelectorAll('.y26-card');
+    var target = null;
+    for (var i = 0; i < sections.length; i++) {
+      var h = sections[i].querySelector('h3');
+      if (h && h.textContent.indexOf(monthKey.replace('-','/')) === 0) { target = sections[i]; break; }
+    }
+    if (!target) return;
+    var items = SCHEDULE[monthKey] || [];
+    var sum = items.reduce(function(s,it){ return s + (it.amount != null && it.amount !== '' ? Number(it.amount) : 0); }, 0);
+    var mt = target.querySelector('.month-total');
+    if (mt) mt.textContent = '固定 NT$ ' + fmtMoney(sum);
+  }
+  function addItem(monthKey){
+    if (!SCHEDULE[monthKey]) SCHEDULE[monthKey] = [];
+    SCHEDULE[monthKey].push({ item: '新項目', cat: '其他', amount: null, paid: false });
+    schedulePush();
+    renderSchedule();
+  }
+  function delItem(monthKey, idx){
+    if (!confirm('確定刪除此項目？')) return;
+    SCHEDULE[monthKey].splice(idx, 1);
+    schedulePush();
+    renderSchedule();
+  }
+  function resetAll(){
+    if (!confirm('將清除所有自訂修改並還原為預設值，是否繼續？')) return;
+    SCHEDULE = buildDefault();
+    schedulePush();
+    renderSchedule();
+  }
+  function exportJson(){
+    var blob = new Blob([JSON.stringify(SCHEDULE, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    var d = new Date();
+    var dd = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+    a.href = url;
+    a.download = '家庭開銷-2026-' + dd + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+  function importJsonFile(file){
+    var r = new FileReader();
+    r.onload = function(e){
+      try {
+        var p = JSON.parse(e.target.result);
+        if (typeof p !== 'object' || !p) throw new Error('JSON 結構不正確');
+        SCHEDULE = p;
+        schedulePush();
+        renderSchedule();
+        alert('匯入成功');
+      } catch(err){ alert('匯入失敗：' + err.message); }
+    };
+    r.readAsText(file);
+  }
+
+  // === Cloud sync ===
+  function schedulePush(){
+    saveCache();
+    if (!CONFIG.url) return;
+    showStatus('待儲存…', 'busy');
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(pushNow, 800);
+  }
+  async function pushNow(){
+    if (!CONFIG.url) return;
+    if (savingNow) { pendingPush = true; return; }
+    savingNow = true; pendingPush = false;
+    showStatus('儲存中…', 'busy');
+    try {
+      var res = await fetch(CONFIG.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'save', data: SCHEDULE })
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var json = await res.json();
+      if (!json.ok) throw new Error(json.error || '儲存失敗');
+      var t = new Date();
+      var hh = String(t.getHours()).padStart(2,'0'), mm = String(t.getMinutes()).padStart(2,'0');
+      showStatus('已同步 ' + hh + ':' + mm, 'ok');
+    } catch(err){
+      showStatus('儲存失敗：' + err.message, 'err');
+    } finally {
+      savingNow = false;
+      if (pendingPush) pushNow();
+    }
+  }
+  async function pullNow(){
+    if (!CONFIG.url) {
+      showStatus('尚未設定雲端', 'info');
+      return;
+    }
+    showStatus('連線中…', 'busy');
+    try {
+      var res = await fetch(CONFIG.url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var json = await res.json();
+      if (!json.ok) throw new Error(json.error || '伺服器錯誤');
+      var data = json.data || {};
+      if (Object.keys(data).length === 0) {
+        // 試算表為空，把目前資料推上去
+        SCHEDULE = buildDefault();
+        saveCache();
+        renderSchedule();
+        await pushNow();
+      } else {
+        SCHEDULE = data;
+        saveCache();
+        renderSchedule();
+        var t = new Date();
+        var hh = String(t.getHours()).padStart(2,'0'), mm = String(t.getMinutes()).padStart(2,'0');
+        showStatus('已同步 ' + hh + ':' + mm, 'ok');
+      }
+    } catch(err){
+      showStatus('連線失敗：' + err.message, 'err');
+    }
+  }
+
+  // === Setup modal ===
+  function openSetup(){
+    document.getElementById('setupUrl').value = CONFIG.url || '';
+    setSetupMsg('');
+    document.getElementById('setupModal').style.display = 'block';
+  }
+  function closeSetup(){ document.getElementById('setupModal').style.display = 'none'; }
+  function clearUrl(){
+    if (!confirm('清除目前的雲端 URL 設定？')) return;
+    CONFIG.url = ''; saveConfig();
+    showStatus('尚未設定雲端', 'info');
+    closeSetup();
+  }
+  function openInTab(){
+    var url = (document.getElementById('setupUrl').value || '').trim();
+    if (!url) { setSetupMsg('請先貼上 URL', '#dc2626'); return; }
+    window.open(url, '_blank');
+  }
+  async function setupSave(){
+    var url = (document.getElementById('setupUrl').value || '').trim();
+    if (!url) { setSetupMsg('請輸入 URL', '#dc2626'); return; }
+    if (url.indexOf('script.google.com') < 0) {
+      setSetupMsg('⚠ URL 不是 Apps Script Web App 網址（應含 script.google.com）', '#dc2626');
+      return;
+    }
+    if (/\/dev$/.test(url)) {
+      setSetupMsg('⚠ 此為 /dev 開發網址，僅你登入時可用。請改用 /exec 結尾的正式網址。', '#dc2626');
+      return;
+    }
+    if (!/\/exec$/.test(url)) {
+      setSetupMsg('⚠ URL 應以 /exec 結尾（部署 Web App 後取得的網址）。', '#dc2626');
+      return;
+    }
+    setSetupMsg('測試中…（若卡住請開 F12 主控台查看）', '#92400e');
+    try {
+      var res = await fetch(url, { method: 'GET', redirect: 'follow' });
+      if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + res.statusText);
+      var text = await res.text();
+      var json;
+      try { json = JSON.parse(text); }
+      catch(e){
+        if (text.indexOf('<html') >= 0 || text.indexOf('登入') >= 0 || text.indexOf('Sign in') >= 0) {
+          throw new Error('收到 HTML 而非 JSON，存取權可能未設為「知道連結的任何人」。請重新部署。');
+        }
+        throw new Error('回應非 JSON：' + text.substring(0, 100));
+      }
+      if (!json.ok) throw new Error(json.error || '伺服器回覆 ok=false');
+      CONFIG.url = url; saveConfig();
+      setSetupMsg('✓ 連線成功，開始同步…', '#065f46');
+      setTimeout(function(){
+        closeSetup();
+        pullNow();
+      }, 700);
+    } catch(err){
+      var msg = err.message || String(err);
+      if (msg.indexOf('Failed to fetch') >= 0) {
+        msg = 'Failed to fetch — 通常代表：(1) URL 錯誤  (2) 部署存取權未設「知道連結的任何人」  (3) 瀏覽器擴充功能擋下。請按「在新分頁開啟測試」確認 URL 是否回傳 JSON。';
+      }
+      setSetupMsg('✗ ' + msg, '#dc2626');
+    }
+  }
+
+  window.__expAdm = { upd: upd, updCat: updCat, updAmount: updAmount, updPaid: updPaid, add: addItem, del: delItem };
+  window.__expCloud = {
+    setup: openSetup, setupClose: closeSetup, setupSave: setupSave,
+    openInTab: openInTab,
+    clearUrl: clearUrl, sync: pullNow, reset: resetAll,
+    exportJson: exportJson
+  };
+
+  function init(){
+    var btn = document.getElementById('adminToggleBtn');
+    if (btn) btn.addEventListener('click', function(){
+      adminMode = !adminMode;
+      btn.textContent = adminMode ? '退出管理模式' : '進入管理模式';
+      btn.classList.toggle('btn-danger', adminMode);
+      var tb = document.getElementById('adminToolbar');
+      if (tb) tb.style.display = adminMode ? 'flex' : 'none';
+      renderSchedule();
+    });
+    var fi = document.getElementById('importFile');
+    if (fi) fi.addEventListener('change', function(e){
+      if (e.target.files && e.target.files[0]) importJsonFile(e.target.files[0]);
+      e.target.value = '';
+    });
+    renderSchedule();
+    if (CONFIG.url) {
+      pullNow();
+    } else {
+      showStatus('尚未設定雲端（點「進入管理模式」→「雲端設定」）', 'info');
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>
